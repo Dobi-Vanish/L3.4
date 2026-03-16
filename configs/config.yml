@@ -1,0 +1,7 @@
+http_port: 8080
+postgres_dsn: "postgres://app_user:secret@postgres:5432/image_service?sslmode=disable"
+kafka_brokers:
+  - "kafka:9092"
+kafka_topic: "image-tasks"
+storage_path: "./storage"
+log_level: "info"

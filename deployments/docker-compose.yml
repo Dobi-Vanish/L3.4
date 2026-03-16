@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_DB: image_service
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - kafka-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    networks:
+      - kafka-net
+      - app-net
+
+  api:
+    build:
+      context: ..
+      dockerfile: api.Dockerfile
+    depends_on:
+      - postgres
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      POSTGRES_DSN: postgres://app_user:secret@postgres:5432/image_service?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      STORAGE_PATH: /app/storage
+      CONFIG_PATH: /app/configs/config.yml
+    volumes:
+      - storage_volume:/app/storage
+    networks:
+      - app-net
+
+  worker:
+    build:
+      context: ..
+      dockerfile: worker.Dockerfile
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      POSTGRES_DSN: postgres://app_user:secret@postgres:5432/image_service?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      STORAGE_PATH: /app/storage
+      CONFIG_PATH: /app/configs/config.yml
+    volumes:
+      - storage_volume:/app/storage
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge
+  kafka-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  storage_volume:
